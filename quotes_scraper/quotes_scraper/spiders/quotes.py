@@ -1,17 +1,41 @@
+from email.quoprimime import quote
 from turtle import title
+
 import scrapy
 #titulo = response.xpath('//div/h1/a/text()').get()
 #top_ten_tag = response.xpath('//div[contains(@class,"tags-box")]//span[@class="tag-item"]/a/text()').getall()
 #citas= response.xpath('//span[@class="text" and @itemprop="text"]/text()').getall()
 #guardar los archivos en el formato deseado--> scrapy crawl quotes -o quotes.csv
+#button --> response.xpath('//ul[@class = "pager"]//li[@class="next"]/a/@href').get()
 class QuotesSpider(scrapy.Spider):
       # name es el nombre unico con el scrapy se va referir al spider dentro del proyect.
     # name debe ser unico.
     name = 'quotes'
      # Defiimos una lista de url a las cuales les vamos a realizar las peticiones http.
     start_urls = ['http://quotes.toscrape.com/']
-      # definir el metodo parse el cual nos sirve para analizar un archivo y extraer informacion valiosa a partir de el.
+    #custom_setting = {
+    #    'FEED_URI': 'quotes.json',
+    #    'FEED_FORMAT': 'json'
+    #}
+    custom_settings = {
+        'FEED_URI': 'quotes.json',
+        'FEED_FORMAT': 'json'
+    }
+    def parse_only_quotes(self, response, **kwargs):
+        if kwargs:
+            quotes = kwargs['quotes']
+        quotes.extend(response.xpath('//span[@class="text" and @itemprop="text"]/text()').getall())
 
+        next_page_button_link = response.xpath(
+            '//ul[@class = "pager"]//li[@class="next"]/a/@href').get()
+        if next_page_button_link:
+            yield response.follow(next_page_button_link, callback=self.parse_only_quotes, cb_kwargs={'quotes': quotes})
+        else:
+            yield{
+                'quotes': quotes
+            }
+
+      # definir el metodo parse el cual nos sirve para analizar un archivo y extraer informacion valiosa a partir de el.
     def parse(self, response):
         #print('*'*10)
         #print('\n\n')
@@ -33,6 +57,8 @@ class QuotesSpider(scrapy.Spider):
         #print('*' * 10)
         yield {
             'title': title,
-            'quotes': quotes,
             'top_ten_tag': top_ten_tag
         }
+        next_page_button_link = response.xpath('//ul[@class = "pager"]//li[@class="next"]/a/@href').get()
+        if next_page_button_link:
+            yield response.follow(next_page_button_link, callback=self.parse_only_quotes, cb_kwargs={'quotes': quotes})
